@@ -15,9 +15,12 @@ if __name__ == '__main__':
 """
 
 from pptx import Presentation
+from oauth2client.client import SignedJwtAssertionCredentials
+from httplib2 import Http
 from models import *
 from sqlalchemy.orm import sessionmaker
 import config
+
 
 prs = Presentation('/Users/mxf7/PycharmProjects/trendscraper/vnx.pptx')
 
