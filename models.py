@@ -29,3 +29,13 @@ class Summary(Base):
         self.avg_io_size = avg_io_size
 
 
+class RefreshToken(Base):
+    __tablename__ = 'rtokens'
+
+    id = Column(Integer(), primary_key=True)
+    token = Column(String())
+
+    def __repr__(self):
+        return '<token {}>'.format(self.token)
+
+
