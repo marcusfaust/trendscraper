@@ -14,8 +14,8 @@ if __name__ == '__main__':
     app.run()
 """
 
-import argparse, requests, re
-import httplib2
+import argparse, requests, re, zipfile, StringIO
+import httplib2, urllib
 from pptx import Presentation
 from oauth2client.client import OAuth2WebServerFlow, flow_from_clientsecrets, AccessTokenCredentials
 from oauth2client import tools
@@ -44,9 +44,11 @@ class GmailSession:
     gmail_client_secret = os.environ.get('GMAIL_CLIENT_SECRET')
 
     """
+    #Present in case re-authorization is needed or if Scope changes
+
     flow = OAuth2WebServerFlow(client_id=gmail_client_id,
                                client_secret=gmail_client_secret,
-                               scope='https://www.googleapis.com/auth/gmail.readonly',
+                               scope='https://www.googleapis.com/auth/gmail.modify',
                                redirect_uri='https://www.example.com/oauth2callback',
                                access_type='offline',
                                approval_prompt='force')
@@ -57,6 +59,7 @@ class GmailSession:
     storage = Storage('Trendscraper.json')
 
     credentials = run_flow(flow, storage, flags)
+    print "hello"
     """
 
     def getAccessToken(self, session):
@@ -76,13 +79,46 @@ class GmailSession:
         #session.query(RefreshToken.filter_by(id=1).update(dict(token=rtoken))
         #db.session.commit()
 
-
         return atoken
 
-    def get_mail(self):
-        pass
+#Function that access a Presentation object, finds Array summary slide within, and scrapes information.  Attemps to call function to populate info into db.
+def scrape_pptx(prs, session):
+    summary_found = False
+    ARRAYSUMMARY = {}
+    for slide in prs.slides:
+        for shape in slide.shapes:
 
-engine = create_engine(URL(**config.DATABASE))
+            if (shape.has_text_frame and shape.text == 'System Summary'):
+                summary_found = True
+                continue
+
+            if (shape.has_table and summary_found):
+                for row in range(0,len(shape.table.rows._tbl.tr_lst)):
+                    ARRAYSUMMARY[shape.table.cell(row,0).text_frame.text] = shape.table.cell(row,1).text_frame.text
+                    summary_found = False
+
+    #Populate DB
+    populate_db_from_scrape(ARRAYSUMMARY, session)
+    print "Database Populated"
+
+#Function that takes ARRAYSUMMARY dict and populates db accepting session object also.
+def populate_db_from_scrape(arraysummary, session):
+    summ = Summary(arraysummary['% Reads'],
+               arraysummary['Front End IOPS - avg'],
+               arraysummary['Front End IOPS - 95th'],
+               arraysummary['Front End IOPS - max'],
+               arraysummary['Model'],
+               arraysummary['Avg IO Size (KB)'])
+
+    session.add(summ)
+    session.commit()
+
+
+
+
+
+#engine = create_engine(URL(**config.DATABASE))
+engine = create_engine(config.SQLALCHEMY_DATABASE_URI)
 Session = sessionmaker(bind=engine)
 session = Session()
 
@@ -90,44 +126,12 @@ gmailsession = GmailSession(session)
 access_token = gmailsession.getAccessToken(session)
 new_credentials = AccessTokenCredentials(access_token, '', '')
 
-print "hello"
-
-def ListMessagesMatchingQuery(service, user_id, query=''):
-    """List all Messages of the user's mailbox matching the query.
-
-    Args:
-    service: Authorized Gmail API service instance.
-    user_id: User's email address. The special value "me"
-    can be used to indicate the authenticated user.
-    query: String used to filter messages returned.
-    Eg.- 'from:user@some_domain.com' for Messages from a particular sender.
-
-    Returns:
-    List of Messages that match the criteria of the query. Note that the
-    returned list contains Message IDs, you must use get with the
-    appropriate ID to get the details of a Message.
-    """
-    try:
-        response = service.users().messages().list(userId=user_id, q=query).execute()
-        messages = []
-        if 'messages' in response:
-            messages.extend(response['messages'])
-
-        while 'nextPageToken' in response:
-              page_token = response['nextPageToken']
-              response = service.users().messages().list(userId=user_id, q=query, pageToken=page_token).execute()
-              messages.extend(response['messages'])
-
-        return messages
-
-    except errors.HttpError, error:
-        print 'An error occurred: %s' % error
 
 # Path to the client_secret.json file downloaded from the Developer Console
 CLIENT_SECRET_FILE = 'Trendscraper.json'
 
 # Check https://developers.google.com/gmail/api/auth/scopes for all available scopes
-OAUTH_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly'
+OAUTH_SCOPE = 'https://www.googleapis.com/auth/gmail.modify'
 
 # Location of the credentials storage file
 #STORAGE = Storage('gmail.storage')
@@ -143,58 +147,35 @@ gmail_service = build('gmail', 'v1', http=http)
 messages = gmail_service.users().messages().list(userId='me').execute()
 
 #Get Contents of Each Message and Populate ftpdict
-for message in messages['messages']:
-    message_text = gmail_service.users().messages().get(id=message['id'], userId='me', format='full').execute()
-    for part in message_text['payload']['parts']:
-        print "hello"
-        if part.has_key('body') and part['body'].has_key('data'):
-            msg = base64.urlsafe_b64decode(part['body']['data'].encode('UTF-8'))
-            ftpmatches = re.findall('\r\n(.*assessment_download.*.zip)\r\n', msg)
-            for link in ftpmatches:
-                ftplinks.append(link)
+if messages.has_key('messages'):
+    for message in messages['messages']:
+        message_text = gmail_service.users().messages().get(id=message['id'], userId='me', format='full').execute()
+        for part in message_text['payload']['parts']:
+            print "hello"
+            if part.has_key('body') and part['body'].has_key('data'):
+                msg = base64.urlsafe_b64decode(part['body']['data'].encode('UTF-8'))
+                ftpmatches = re.findall('\r\n(.*assessment_download.*.zip)\r\n', msg)
+                for link in ftpmatches:
+                    ftplinks.append(link)
 
-print "hello"
+    #Delete Email Message
+    gmail_service.users().messages().trash(id=message['id'], userId='me').execute()
 
+#Download Each FTP Link and find pptx file in zipfile
+for link in ftplinks:
+    print "Downloading " + link
+    filename = re.findall('\/(\w+.zip)', link)
+    file = urllib.urlretrieve(link, "./" + filename[0])
+    print "Done"
 
+    #Create zipfile object
+    zf = zipfile.ZipFile(filename[0], 'r')
+    for archive in zf.filelist:
+        if re.match('.*VNX Profile.pptx', archive.filename):
+            temp_pptx = zf.read(archive.filename)
+            stream = StringIO.StringIO(temp_pptx)
+            prs = Presentation(stream)
+            scrape_pptx(prs, session)
 
-#Download any new emails from service account
-#new_messages = ListMessagesMatchingQuery(gmail_service, 'me', 'from:mfaust@fusionstorm.com')
-#response = gmail_service.users().messages().list(userId='me', q='').execute(http=http_auth)
-
-prs = Presentation('/Users/mxf7/PycharmProjects/trendscraper/vnx.pptx')
-
-summary_found = False
-ARRAYSUMMARY = {}
-for slide in prs.slides:
-    for shape in slide.shapes:
-        if (shape.has_text_frame and shape.text == 'System Summary'):
-            summary_found = True
-            continue
-
-        if (shape.has_table and summary_found):
-            for row in range(0,len(shape.table.rows._tbl.tr_lst)):
-                ARRAYSUMMARY[shape.table.cell(row,0).text_frame.text] = shape.table.cell(row,1).text_frame.text
-                summary_found = False
-
-
-print "hello"
-#INSERT Summary information into db
-
-engine = create_engine(URL(**config.DATABASE))
-Session = sessionmaker(bind=engine)
-session = Session()
-
-summ = Summary(ARRAYSUMMARY['% Reads'],
-               ARRAYSUMMARY['Front End IOPS - avg'],
-               ARRAYSUMMARY['Front End IOPS - 95th'],
-               ARRAYSUMMARY['Front End IOPS - max'],
-               ARRAYSUMMARY['Model'],
-               ARRAYSUMMARY['Avg IO Size (KB)'])
-
-session.add(summ)
-session.commit()
-
-print "hello"
-
-
-
+    #Delete downloaded zip file
+    os.remove("./" + filename[0])

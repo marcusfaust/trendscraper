@@ -1,7 +1,7 @@
 import datetime
 from sqlalchemy import Column, Integer, String, ForeignKey, Table, create_engine, TIMESTAMP
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy.orm import relationship, backref, sessionmaker
 from sqlalchemy.engine.url import URL
 
 

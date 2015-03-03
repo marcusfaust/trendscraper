@@ -6,4 +6,4 @@ DATABASE = {'drivername': 'postgres',
             'username': 'mxf7',
             'database': 'trendscraper'}
 
-#SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URL']
+SQLALCHEMY_DATABASE_URI = os.environ['DATABASE_URL']
