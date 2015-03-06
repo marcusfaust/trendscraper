@@ -3,17 +3,20 @@ from flask import Flask
 from models import *
 import config
 from flask.ext import restful
+import flask.ext.restless
 import json
 
 
 app = Flask(__name__)
-api = restful.Api(app)
+#api = restful.Api(app)
 
 engine = create_engine(config.SQLALCHEMY_DATABASE_URI)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-
+manager = flask.ext.restless.APIManager(app, session=session)
+last10 = manager.create_api(Summary, methods=['GET', 'POST'])
+"""
 class HelloWorld(restful.Resource):
     def get(self):
         return {'hello': 'world'}
@@ -37,6 +40,8 @@ class Last10(restful.Resource):
 
 api.add_resource(HelloWorld, '/')
 api.add_resource(Last10, '/last10')
+"""
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
