@@ -127,8 +127,8 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 #TEST
-prs = Presentation('vnx.pptx')
-scrape_pptx(prs, session)
+#prs = Presentation('vnx.pptx')
+#scrape_pptx(prs, session)
 
 gmailsession = GmailSession(session)
 access_token = gmailsession.getAccessToken(session)
