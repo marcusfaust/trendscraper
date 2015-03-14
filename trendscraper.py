@@ -88,6 +88,11 @@ def scrape_pptx(prs, session):
     for slide in prs.slides:
         for shape in slide.shapes:
 
+            if (shape.name == 'Subtitle 2'):
+                m = re.search("(\w+.*)\nAs of.*", shape.text)
+                if m is not None:
+                    ARRAYSUMMARY['Customer'] =  m.group(1).rstrip()
+
             if (shape.has_text_frame and shape.text == 'System Summary'):
                 summary_found = True
                 continue
@@ -103,7 +108,8 @@ def scrape_pptx(prs, session):
 
 #Function that takes ARRAYSUMMARY dict and populates db accepting session object also.
 def populate_db_from_scrape(arraysummary, session):
-    summ = Summary(arraysummary['% Reads'],
+    summ = Summary(arraysummary['Customer'],
+               arraysummary['% Reads'],
                arraysummary['Front End IOPS - avg'],
                arraysummary['Front End IOPS - 95th'],
                arraysummary['Front End IOPS - max'],
@@ -115,12 +121,14 @@ def populate_db_from_scrape(arraysummary, session):
 
 
 
-
-
 #engine = create_engine(URL(**config.DATABASE))
 engine = create_engine(config.SQLALCHEMY_DATABASE_URI)
 Session = sessionmaker(bind=engine)
 session = Session()
+
+#TEST
+prs = Presentation('vnx.pptx')
+scrape_pptx(prs, session)
 
 gmailsession = GmailSession(session)
 access_token = gmailsession.getAccessToken(session)
