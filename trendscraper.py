@@ -190,8 +190,8 @@ if messages.has_key('messages'):
                 for link in ftpmatches:
                     ftplinks.append(link)
 
-    #Delete Email Message
-    gmail_service.users().messages().trash(id=message['id'], userId='me').execute()
+        #Delete Email Message
+        gmail_service.users().messages().trash(id=message['id'], userId='me').execute()
 
 #Download Each FTP Link and find pptx file in zipfile
 for link in ftplinks:
