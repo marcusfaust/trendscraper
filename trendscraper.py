@@ -83,7 +83,8 @@ class GmailSession:
 
 #Function that access a Presentation object, finds Array summary slide within, and scrapes information.  Attemps to call function to populate info into db.
 def scrape_pptx(prs, session):
-    summary_found = False
+    array_summary_found = False
+    system_summary_found = False
     ARRAYSUMMARY = {}
     for slide in prs.slides:
         for shape in slide.shapes:
@@ -93,14 +94,26 @@ def scrape_pptx(prs, session):
                 if m is not None:
                     ARRAYSUMMARY['Customer'] =  m.group(1).rstrip()
 
-            if (shape.has_text_frame and shape.text == 'System Summary'):
-                summary_found = True
+            if (shape.has_text_frame and shape.text == 'Summary'):
+                array_summary_found = True
                 continue
 
-            if (shape.has_table and summary_found):
+            if (shape.has_text_frame and shape.text == 'System Summary'):
+                system_summary_found = True
+                continue
+
+            if (shape.has_table and system_summary_found):
                 for row in range(0,len(shape.table.rows._tbl.tr_lst)):
                     ARRAYSUMMARY[shape.table.cell(row,0).text_frame.text] = shape.table.cell(row,1).text_frame.text
-                    summary_found = False
+                    system_summary_found = False
+
+            if (shape.has_table and array_summary_found):
+                #for column in range(0,len(shape.table.rows._tbl.tr_lst)):
+                    nametext = shape.table.cell(1,0).text_frame.text
+                    ARRAYSUMMARY['array_name'], ARRAYSUMMARY['serial_no'] = nametext.split( )
+                    ARRAYSUMMARY['serial_no'] =  ARRAYSUMMARY['serial_no'].replace("(", "")
+                    ARRAYSUMMARY['serial_no'] =  ARRAYSUMMARY['serial_no'].replace(")", "")
+                    array_summary_found = False
 
     #Populate DB
     populate_db_from_scrape(ARRAYSUMMARY, session)
@@ -109,6 +122,11 @@ def scrape_pptx(prs, session):
 #Function that takes ARRAYSUMMARY dict and populates db accepting session object also.
 def populate_db_from_scrape(arraysummary, session):
     summ = Summary(arraysummary['Customer'],
+               arraysummary['array_name'],
+               arraysummary['serial_no'],
+               arraysummary['FLARE'],
+               arraysummary['Configured LUN Capacity'],
+               arraysummary['Disk Capacity'],
                arraysummary['% Reads'],
                arraysummary['Front End IOPS - avg'],
                arraysummary['Front End IOPS - 95th'],
@@ -127,8 +145,8 @@ Session = sessionmaker(bind=engine)
 session = Session()
 
 #TEST
-#prs = Presentation('vnx.pptx')
-#scrape_pptx(prs, session)
+prs = Presentation('vnx.pptx')
+scrape_pptx(prs, session)
 
 gmailsession = GmailSession(session)
 access_token = gmailsession.getAccessToken(session)

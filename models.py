@@ -14,7 +14,11 @@ class Summary(Base):
     id = Column(Integer, primary_key=True)
     timestamp = Column(TIMESTAMP(timezone=True), primary_key=False, nullable=False, default=datetime.datetime.now)
     customer = Column(String)
+    array_name = Column(String)
     serial_no = Column(String)
+    flare_version = Column(String)
+    lun_capacity = Column(String)
+    disk_capacity = Column(String)
     percent_read = Column(String)
     iops_avg = Column(String)
     iops_95th = Column(String)
@@ -22,8 +26,13 @@ class Summary(Base):
     model = Column(String)
     avg_io_size = Column(String)
 
-    def __init__(self, customer, percent_read, iops_avg, iops_95th, iops_max, model, avg_io_size):
+    def __init__(self, customer, array_name, serial_no, flare_version, lun_capacity, disk_capacity, percent_read, iops_avg, iops_95th, iops_max, model, avg_io_size):
         self.customer = customer
+        self.array_name = array_name
+        self.serial_no = serial_no
+        self.flare_version = flare_version
+        self.lun_capacity = lun_capacity
+        self.disk_capacity = disk_capacity
         self.percent_read = percent_read
         self.iops_avg = iops_avg
         self.iops_95th = iops_95th
