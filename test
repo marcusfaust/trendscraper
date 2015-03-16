@@ -1,0 +1,10 @@
+import requests
+import json
+
+url = 'http://trendscraper.herokuapp.com/api/summary'
+filter = {"q": json.dumps({"limit": 10})}
+params = filter
+r = requests.get(url, params=params)
+response = r.json()
+
+print "hello"

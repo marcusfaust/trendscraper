@@ -116,6 +116,7 @@ def scrape_pptx(prs, session):
                     array_summary_found = False
 
     #Populate DB
+    print ARRAYSUMMARY
     populate_db_from_scrape(ARRAYSUMMARY, session)
     print "Database Populated"
 
