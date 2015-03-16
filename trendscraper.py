@@ -94,7 +94,7 @@ def scrape_pptx(prs, session):
                 if m is not None:
                     ARRAYSUMMARY['Customer'] =  m.group(1).rstrip()
 
-            if (shape.has_text_frame and shape.text == 'Summary'):
+            if (shape.has_text_frame and re.search("^Summary", shape.text)):
                 array_summary_found = True
                 continue
 
@@ -110,13 +110,18 @@ def scrape_pptx(prs, session):
             if (shape.has_table and array_summary_found):
                 #for column in range(0,len(shape.table.rows._tbl.tr_lst)):
                     nametext = shape.table.cell(1,0).text_frame.text
-                    ARRAYSUMMARY['array_name'], ARRAYSUMMARY['serial_no'] = nametext.split( )
-                    ARRAYSUMMARY['serial_no'] =  ARRAYSUMMARY['serial_no'].replace("(", "")
-                    ARRAYSUMMARY['serial_no'] =  ARRAYSUMMARY['serial_no'].replace(")", "")
-                    array_summary_found = False
+                    if (re.search("\(", nametext)):
+                        ARRAYSUMMARY['array_name'], ARRAYSUMMARY['serial_no'] = nametext.split( )
+                        ARRAYSUMMARY['serial_no'] =  ARRAYSUMMARY['serial_no'].replace("(", "")
+                        ARRAYSUMMARY['serial_no'] =  ARRAYSUMMARY['serial_no'].replace(")", "")
+                        array_summary_found = False
+                    else:
+                        ARRAYSUMMARY['array_name'] = nametext
+                        ARRAYSUMMARY['serial_no'] = nametext
+                        array_summary_found = False
 
     #Populate DB
-    print ARRAYSUMMARY
+    #print ARRAYSUMMARY
     populate_db_from_scrape(ARRAYSUMMARY, session)
     print "Database Populated"
 
